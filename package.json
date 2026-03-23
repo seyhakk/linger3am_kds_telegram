@@ -1,0 +1,8 @@
+{
+  "name": "kds-frontend",
+  "version": "1.0.0",
+  "description": "Kitchen Display System Frontend",
+  "scripts": {
+    "start": "npx serve ."
+  }
+}
