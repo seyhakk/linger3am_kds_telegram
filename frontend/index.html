@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KDS - Kitchen Display System</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-left">
+        <h1 class="logo">🍳 KDS</h1>
+        <nav class="nav-tabs">
+          <button class="tab active" data-view="orders">Orders</button>
+          <button class="tab" data-view="analytics">Analytics</button>
+        </nav>
+      </div>
+      <div class="header-right">
+        <div class="station-filter">
+          <label>Station:</label>
+          <select id="stationFilter">
+            <option value="">All Stations</option>
+          </select>
+        </div>
+        <div class="status-indicator">
+          <span class="dot"></span>
+          <span>Live</span>
+        </div>
+        <button id="refreshBtn" class="btn-icon" title="Refresh">↻</button>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <div id="ordersView" class="view active">
+        <div class="toolbar">
+          <div class="filter-group">
+            <button class="filter-btn active" data-status="">All</button>
+            <button class="filter-btn" data-status="pending">Pending</button>
+            <button class="filter-btn" data-status="preparing">Preparing</button>
+            <button class="filter-btn" data-status="ready">Ready</button>
+            <button class="filter-btn" data-status="completed">Completed</button>
+          </div>
+          <div class="sort-group">
+            <label>Sort by:</label>
+            <select id="sortBy">
+              <option value="priority">Priority</option>
+              <option value="time">Time</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="ordersContainer" class="orders-grid">
+          <!-- Orders will be rendered here -->
+        </div>
+      </div>
+
+      <div id="analyticsView" class="view">
+        <div class="analytics-grid">
+          <div class="stat-card">
+            <h3>Total Orders</h3>
+            <div id="totalOrders" class="stat-value">-</div>
+          </div>
+          <div class="stat-card">
+            <h3>In Progress</h3>
+            <div id="inProgress" class="stat-value">-</div>
+          </div>
+          <div class="stat-card">
+            <h3>Completed</h3>
+            <div id="completedOrders" class="stat-value">-</div>
+          </div>
+          <div class="stat-card">
+            <h3>Avg Prep Time</h3>
+            <div id="avgPrepTime" class="stat-value">-</div>
+          </div>
+        </div>
+
+        <div class="chart-section">
+          <h3>Orders by Status</h3>
+          <div id="statusChart" class="chart"></div>
+        </div>
+
+        <div class="chart-section">
+          <h3>Orders by Station</h3>
+          <div id="stationChart" class="chart"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Order Modal -->
+  <div id="orderModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modalOrderNumber">Order #</h2>
+        <button class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="order-details">
+          <div class="detail-row">
+            <span class="label">Customer:</span>
+            <span id="modalCustomer" class="value"></span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Station:</span>
+            <span id="modalStation" class="value"></span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Status:</span>
+            <span id="modalStatus" class="value"></span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Time:</span>
+            <span id="modalTime" class="value"></span>
+          </div>
+          <div class="detail-row" id="priorityRow">
+            <span class="label">Priority:</span>
+            <span id="modalPriority" class="value"></span>
+          </div>
+          <div class="detail-row" id="notesRow">
+            <span class="label">Notes:</span>
+            <span id="modalNotes" class="value"></span>
+          </div>
+        </div>
+
+        <div class="items-section">
+          <h4>Items</h4>
+          <ul id="modalItems" class="items-list"></ul>
+          <div class="total-row">
+            <strong>Total:</strong>
+            <strong id="modalTotal">$0.00</strong>
+          </div>
+        </div>
+
+        <div class="status-history">
+          <h4>Status History</h4>
+          <ul id="historyList" class="history-list"></ul>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="changeStatusBtn" class="btn btn-primary">Change Status</button>
+        <button id="priorityBtn" class="btn btn-secondary">Set Priority</button>
+        <button id="closeModalBtn" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status Change Modal -->
+  <div id="statusModal" class="modal">
+    <div class="modal-content modal-small">
+      <div class="modal-header">
+        <h2>Change Status</h2>
+        <button class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="status-buttons">
+          <button class="status-btn btn-pending" data-status="pending">Pending</button>
+          <button class="status-btn btn-preparing" data-status="preparing">Preparing</button>
+          <button class="status-btn btn-ready" data-status="ready">Ready</button>
+          <button class="status-btn btn-completed" data-status="completed">Completed</button>
+          <button class="status-btn btn-cancelled" data-status="cancelled">Cancelled</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audio Alert -->
+  <audio id="alertSound" preload="auto">
+    <source src="alert.mp3" type="audio/mpeg">
+  </audio>
+
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="app.js"></script>
+</body>
+</html>
