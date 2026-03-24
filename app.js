@@ -209,12 +209,9 @@ function createOrderCard(order) {
         <button class="action-btn btn-new ${isNew ? 'active' : ''}" 
           onclick="updateStatus('${order.id}', 'new')" 
           ${!isNew ? 'disabled' : ''}>NEW</button>
-        <button class="action-btn btn-preparing ${isPreparing ? 'active' : ''}" 
-          onclick="updateStatus('${order.id}', 'preparing')" 
-          ${!isNew && !isPreparing ? 'disabled' : ''}>PREPARING</button>
-        <button class="action-btn btn-completed ${isCompleted ? 'active' : ''}" 
+        <button class="action-btn btn-completed ${(isPreparing || isNew) ? '' : 'active'}" 
           onclick="updateStatus('${order.id}', 'completed')" 
-          ${!isPreparing && !isCompleted ? 'disabled' : ''}>DONE</button>
+          ${isCompleted ? 'disabled' : ''}>DONE</button>
       </div>
     </div>
   `;
@@ -230,6 +227,27 @@ async function updateStatus(orderId, newStatus) {
     await fetchOrders();
   } catch (err) {
     console.error('Failed to update status:', err);
+  }
+}
+
+async function clearCompleted() {
+  if (!confirm('Delete all completed orders?')) return;
+  
+  try {
+    const completedOrders = currentOrders.filter(o => o.status === 'completed');
+    for (const order of completedOrders) {
+      await sbFetch('orders?id=eq.' + order.id, {
+        method: 'DELETE',
+        headers: { 'Prefer': 'return=minimal' }
+      });
+      await sbFetch('order_items?order_id=eq.' + order.id, {
+        method: 'DELETE',
+        headers: { 'Prefer': 'return=minimal' }
+      });
+    }
+    await fetchOrders();
+  } catch (err) {
+    console.error('Failed to clear orders:', err);
   }
 }
 
