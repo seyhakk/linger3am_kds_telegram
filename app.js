@@ -1,11 +1,11 @@
-const SUPABASE_URL = 'https://dcdqjbozueinbrmfumif.supabase.co';
+const SUPABASE_URL = 'https://dcdqjbozueinbrmfumif.supabaseClient.co';
 const SUPABASE_KEY = 'sb_publishable_kHV_xJY_7zduu-ygvwn-8Q_Dnw4Fb8e';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabaseClientClient = window.supabaseClient.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentOrders = [];
 let pollInterval;
 let stations = [];
-let config = { enableAlerts: true, alertSound: '/sounds/alert.mp3' };
+let config = { enableAlerts: false, alertSound: '/sounds/alert.mp3' };
 let lastOrderCount = 0;
 
 const state = {
@@ -30,7 +30,7 @@ async function loadConfig() {
 async function loadStations() {
   try {
     // Try to fetch from stations table, or use default
-    const { data, error } = await supabase.from('stations').select('*').order('sort_order');
+    const { data, error } = await supabaseClient.from('stations').select('*').order('sort_order');
     if (error || !data || data.length === 0) {
       stations = [
         { id: 1, name: 'Kitchen' },
@@ -72,7 +72,7 @@ function stopPolling() {
 async function fetchOrders() {
   try {
     // Fetch from webhook_logs table (Telegram orders)
-    let query = supabase.from('webhook_logs')
+    let query = supabaseClient.from('webhook_logs')
       .select('*')
       .order('created_at', { ascending: false });
 
@@ -86,7 +86,7 @@ async function fetchOrders() {
 
     // Fetch order items for each order
     const ordersWithItems = await Promise.all((orders || []).map(async (order) => {
-      const { data: items } = await supabase.from('order_items').select('*').eq('order_id', order.id);
+      const { data: items } = await supabaseClient.from('order_items').select('*').eq('order_id', order.id);
       return {
         ...order,
         items: items || [],
@@ -219,7 +219,7 @@ function openOrderModal(order) {
 
 async function updateOrderStatus(orderId, newStatus) {
   try {
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from('webhook_logs')
       .update({ status: newStatus, updated_at: new Date().toISOString() })
       .eq('id', orderId);
@@ -240,7 +240,7 @@ async function togglePriority(orderId) {
     const order = currentOrders.find(o => o.id === orderId);
     const newPriority = order.priority > 0 ? 0 : 1;
 
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from('orders')
       .update({ priority: newPriority })
       .eq('id', orderId);
