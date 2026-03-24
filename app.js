@@ -1,11 +1,6 @@
 const SUPABASE_URL = 'https://dcdqjbozueinbrmfumif.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjZHFqYm96dWVpbmJybWZ1bWlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMzI3NDcsImV4cCI6MjA4OTgwODc0N30.VXxCEz1KIXxsh5_N-M1h7Fpa6OJ8oQCCSehWAzAiOoc';
 
-let supabase = null;
-if (window.supabaseClient?.createClient) {
-  supabase = window.supabaseClient.createClient(SUPABASE_URL, SUPABASE_KEY);
-}
-
 async function sbFetch(path, options = {}) {
   try {
     const res = await fetch(SUPABASE_URL + "/rest/v1/" + path, {
