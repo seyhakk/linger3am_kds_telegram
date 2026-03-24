@@ -95,22 +95,27 @@ function stopPolling() {
 
 async function fetchOrders() {
   try {
-    let query = 'orders?select=*&order=created_at.desc';
-    if (state.stationFilter) {
-      query += '&station_id=eq.' + state.stationFilter;
-    }
-    const orders = await sbFetch(query);
-
-    const ordersWithItems = await Promise.all((orders || []).map(async (order) => {
-      const items = await sbFetch('order_items?order_id=eq.' + order.id + '&select=*');
-      return {
-        ...order,
-        items: items || [],
-        order_number: order.order_ref || order.id,
-        customer_name: order.telegram_username || order.customer_name || 'Guest',
-        status: order.status || 'new',
-        station_name: order.station_name || 'Kitchen'
-      };
+    const [ordersRes, itemsRes] = await Promise.all([
+      sbFetch('orders?select=*&order=created_at.desc'),
+      sbFetch('order_items?select=*')
+    ]);
+    
+    const orders = ordersRes || [];
+    const items = itemsRes || [];
+    
+    const orderItemsMap = {};
+    items.forEach(item => {
+      if (!orderItemsMap[item.order_id]) orderItemsMap[item.order_id] = [];
+      orderItemsMap[item.order_id].push(item);
+    });
+    
+    const ordersWithItems = orders.map(order => ({
+      ...order,
+      items: orderItemsMap[order.id] || [],
+      order_number: order.order_ref || order.id,
+      customer_name: order.telegram_username || order.customer_name || 'Guest',
+      status: order.status || 'new',
+      station_name: order.station_name || 'Kitchen'
     }));
 
     const previousCount = currentOrders.length;
