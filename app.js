@@ -207,12 +207,12 @@ function createOrderCard(order) {
       <div class="order-customer">@${order.customer_name}</div>
       <div class="order-total">$${parseFloat(order.total_amount || 0).toFixed(2)}</div>
       <div class="order-actions">
-        <button class="action-btn btn-new ${isNew ? 'active' : ''}" 
-          onclick="updateStatus('${order.id}', 'new')" 
-          ${!isNew ? 'disabled' : ''}>NEW</button>
-        <button class="action-btn btn-completed ${(isPreparing || isNew) ? '' : 'active'}" 
+        <button class="action-btn btn-preparing" 
+          onclick="updateStatus('${order.id}', 'preparing')" 
+          ${!isNew ? 'disabled' : ''}>PREPARE</button>
+        <button class="action-btn btn-completed" 
           onclick="updateStatus('${order.id}', 'completed')" 
-          ${isCompleted ? 'disabled' : ''}>DONE</button>
+          ${!isNew && !isPreparing ? 'disabled' : ''}>DONE</button>
       </div>
     </div>
   `;
