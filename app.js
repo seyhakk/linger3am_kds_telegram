@@ -1,6 +1,31 @@
-const SUPABASE_URL = 'https://dcdqjbozueinbrmfumif.supabaseClient.co';
-const SUPABASE_KEY = 'sb_publishable_kHV_xJY_7zduu-ygvwn-8Q_Dnw4Fb8e';
-const supabaseClientClient = window.supabaseClient.createClient(SUPABASE_URL, SUPABASE_KEY);
+const SUPABASE_URL = 'https://dcdqjbozueinbrmfumif.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjZHFqYm96dWVpbmJybWZ1bWlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMzI3NDcsImV4cCI6MjA4OTgwODc0N30.VXxCEz1KIXxsh5_N-M1h7Fpa6OJ8oQCCSehWAzAiOoc';
+
+let supabase = null;
+if (window.supabaseClient?.createClient) {
+  supabase = window.supabaseClient.createClient(SUPABASE_URL, SUPABASE_KEY);
+}
+
+async function sbFetch(path, options = {}) {
+  try {
+    const res = await fetch(SUPABASE_URL + "/rest/v1/" + path, {
+      method: options.method || "GET",
+      headers: {
+        "apikey": SUPABASE_KEY,
+        "Authorization": "Bearer " + SUPABASE_KEY,
+        "Content-Type": "application/json",
+        ...(options.headers || {})
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined
+    });
+    if (!res.ok) throw new Error("Supabase error " + res.status);
+    const ct = res.headers.get("content-type") || "";
+    return ct.includes("application/json") ? res.json() : res.text();
+  } catch (err) {
+    console.warn('Fetch error:', err.message);
+    throw err;
+  }
+}
 
 let currentOrders = [];
 let pollInterval;
@@ -29,9 +54,8 @@ async function loadConfig() {
 
 async function loadStations() {
   try {
-    // Try to fetch from stations table, or use default
-    const { data, error } = await supabaseClient.from('stations').select('*').order('sort_order');
-    if (error || !data || data.length === 0) {
+    const data = await sbFetch('stations?select=*&order=sort_order.asc');
+    if (!data || data.length === 0) {
       stations = [
         { id: 1, name: 'Kitchen' },
         { id: 2, name: 'Bar' },
@@ -71,28 +95,20 @@ function stopPolling() {
 
 async function fetchOrders() {
   try {
-    // Fetch from webhook_logs table (Telegram orders)
-    let query = supabaseClient.from('webhook_logs')
-      .select('*')
-      .order('created_at', { ascending: false });
-
+    let query = 'orders?select=*&order=created_at.desc';
     if (state.stationFilter) {
-      query = query.eq('station_id', state.stationFilter);
+      query += '&station_id=eq.' + state.stationFilter;
     }
+    const orders = await sbFetch(query);
 
-    const { data: orders, error } = await query;
-
-    if (error) throw error;
-
-    // Fetch order items for each order
     const ordersWithItems = await Promise.all((orders || []).map(async (order) => {
-      const { data: items } = await supabaseClient.from('order_items').select('*').eq('order_id', order.id);
+      const items = await sbFetch('order_items?order_id=eq.' + order.id + '&select=*');
       return {
         ...order,
         items: items || [],
-        order_number: order.id || order.order_id || 'ORD-' + order.id,
-        customer_name: order.first_name || order.customer_name || 'Telegram User',
-        status: order.status || 'pending',
+        order_number: order.order_ref || order.id,
+        customer_name: order.telegram_username || order.customer_name || 'Guest',
+        status: order.status || 'new',
         station_name: order.station_name || 'Kitchen'
       };
     }));
@@ -156,7 +172,7 @@ function createOrderCard(order) {
     ? order.items.map(item => `
         <div class="order-item">
           <span class="item-name">${item.item_name}</span>
-          <span class="item-quantity">x${item.quantity}</span>
+          <span class="item-quantity">x${item.qty || item.quantity || 1}</span>
         </div>
       `).join('')
     : '<div class="order-item">No items</div>';
@@ -205,7 +221,7 @@ function openOrderModal(order) {
     itemsList.innerHTML = order.items.map(item => `
       <li>
         <span>${item.item_name}</span>
-        <span>x${item.quantity}</span>
+        <span>x${item.qty || item.quantity || 1}</span>
       </li>
     `).join('');
   } else {
@@ -219,12 +235,11 @@ function openOrderModal(order) {
 
 async function updateOrderStatus(orderId, newStatus) {
   try {
-    const { error } = await supabaseClient
-      .from('webhook_logs')
-      .update({ status: newStatus, updated_at: new Date().toISOString() })
-      .eq('id', orderId);
-
-    if (error) throw error;
+    await sbFetch('orders?id=eq.' + orderId, {
+      method: 'PATCH',
+      headers: { 'Prefer': 'return=minimal' },
+      body: { status: newStatus, updated_at: new Date().toISOString() }
+    });
 
     await fetchOrders();
     if (state.selectedOrder && state.selectedOrder.id === orderId) {
@@ -240,12 +255,11 @@ async function togglePriority(orderId) {
     const order = currentOrders.find(o => o.id === orderId);
     const newPriority = order.priority > 0 ? 0 : 1;
 
-    const { error } = await supabaseClient
-      .from('orders')
-      .update({ priority: newPriority })
-      .eq('id', orderId);
-
-    if (error) throw error;
+    await sbFetch('orders?id=eq.' + orderId, {
+      method: 'PATCH',
+      headers: { 'Prefer': 'return=minimal' },
+      body: { priority: newPriority }
+    });
 
     await fetchOrders();
   } catch (err) {
