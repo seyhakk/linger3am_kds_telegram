@@ -149,6 +149,7 @@ function renderOrders() {
   const container = document.getElementById('ordersContainer');
   
   const filtered = currentOrders.filter(order => {
+    if (hiddenOrders.has(order.id)) return false;
     if (currentStatusFilter === 'new') {
       return order.status === 'new' || order.status === 'pending';
     } else if (currentStatusFilter === 'preparing') {
@@ -230,27 +231,12 @@ async function updateStatus(orderId, newStatus) {
   }
 }
 
+let hiddenOrders = new Set();
+
 async function clearCompleted() {
-  if (!confirm('Clear all completed orders?')) return;
-  
-  try {
-    const completedOrders = currentOrders.filter(o => o.status === 'completed');
-    console.log('Clearing completed orders:', completedOrders.length);
-    
-    for (const order of completedOrders) {
-      console.log('Deleting order:', order.id);
-      await sbFetch('orders?id=eq.' + order.id, {
-        method: 'DELETE',
-        headers: { 'Prefer': 'return=minimal' }
-      });
-    }
-    
-    alert('Cleared ' + completedOrders.length + ' orders');
-    await fetchOrders();
-  } catch (err) {
-    console.error('Failed to clear orders:', err);
-    alert('Failed to clear orders');
-  }
+  const completedOrders = currentOrders.filter(o => o.status === 'completed');
+  completedOrders.forEach(o => hiddenOrders.add(o.id));
+  renderOrders();
 }
 
 document.addEventListener('DOMContentLoaded', init);
