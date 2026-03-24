@@ -231,23 +231,25 @@ async function updateStatus(orderId, newStatus) {
 }
 
 async function clearCompleted() {
-  if (!confirm('Delete all completed orders?')) return;
+  if (!confirm('Clear all completed orders?')) return;
   
   try {
     const completedOrders = currentOrders.filter(o => o.status === 'completed');
+    console.log('Clearing completed orders:', completedOrders.length);
+    
     for (const order of completedOrders) {
+      console.log('Deleting order:', order.id);
       await sbFetch('orders?id=eq.' + order.id, {
         method: 'DELETE',
         headers: { 'Prefer': 'return=minimal' }
       });
-      await sbFetch('order_items?order_id=eq.' + order.id, {
-        method: 'DELETE',
-        headers: { 'Prefer': 'return=minimal' }
-      });
     }
+    
+    alert('Cleared ' + completedOrders.length + ' orders');
     await fetchOrders();
   } catch (err) {
     console.error('Failed to clear orders:', err);
+    alert('Failed to clear orders');
   }
 }
 
