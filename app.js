@@ -29,9 +29,17 @@ async function loadConfig() {
 
 async function loadStations() {
   try {
+    // Try to fetch from stations table, or use default
     const { data, error } = await supabase.from('stations').select('*').order('sort_order');
-    if (error) throw error;
-    stations = data || [];
+    if (error || !data || data.length === 0) {
+      stations = [
+        { id: 1, name: 'Kitchen' },
+        { id: 2, name: 'Bar' },
+        { id: 3, name: 'Dessert' }
+      ];
+    } else {
+      stations = data;
+    }
 
     const select = document.getElementById('stationFilter');
     select.innerHTML = '<option value="">All Stations</option>';
@@ -42,7 +50,11 @@ async function loadStations() {
       select.appendChild(option);
     });
   } catch (err) {
-    console.error('Failed to load stations:', err);
+    stations = [
+      { id: 1, name: 'Kitchen' },
+      { id: 2, name: 'Bar' },
+      { id: 3, name: 'Dessert' }
+    ];
   }
 }
 
@@ -59,23 +71,16 @@ function stopPolling() {
 
 async function fetchOrders() {
   try {
-    let query = supabase.from('orders')
-      .select(`
-        *,
-        stations (
-          id,
-          name
-        )
-      `);
+    // Fetch from webhook_logs table (Telegram orders)
+    let query = supabase.from('webhook_logs')
+      .select('*')
+      .order('created_at', { ascending: false });
 
     if (state.stationFilter) {
       query = query.eq('station_id', state.stationFilter);
     }
-    if (state.statusFilter) {
-      query = query.eq('status', state.statusFilter);
-    }
 
-    const { data: orders, error } = await query.order('priority', { ascending: false }).order('created_at', { ascending: false });
+    const { data: orders, error } = await query;
 
     if (error) throw error;
 
@@ -85,7 +90,10 @@ async function fetchOrders() {
       return {
         ...order,
         items: items || [],
-        station_name: order.stations?.name || 'No station'
+        order_number: order.id || order.order_id || 'ORD-' + order.id,
+        customer_name: order.first_name || order.customer_name || 'Telegram User',
+        status: order.status || 'pending',
+        station_name: order.station_name || 'Kitchen'
       };
     }));
 
@@ -98,7 +106,6 @@ async function fetchOrders() {
       }
       console.log(`${ordersWithItems.length - previousCount} new order(s)!`);
     } else if (previousCount > 0 && ordersWithItems.length < previousCount) {
-      // Orders decreased - could indicate completion/deletion
       console.log('Orders updated');
     }
 
@@ -213,7 +220,7 @@ function openOrderModal(order) {
 async function updateOrderStatus(orderId, newStatus) {
   try {
     const { error } = await supabase
-      .from('orders')
+      .from('webhook_logs')
       .update({ status: newStatus, updated_at: new Date().toISOString() })
       .eq('id', orderId);
 
