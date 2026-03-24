@@ -128,32 +128,20 @@ body {
 .status-tab[data-status="preparing"] .tab-count { color: #3b82f6; }
 .status-tab[data-status="completed"] .tab-count { color: #10b981; }
 
-.status-tab {
-  position: relative;
-}
-
-.clear-btn {
-  position: absolute;
-  top: 10px;
-  right: 10px;
+.clear-all-btn {
   background: #ef4444;
   border: none;
   color: white;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  font-size: 12px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.3s;
+  margin: 10px 0 10px 20px;
+  transition: all 0.3s;
 }
 
-.status-tab[data-status="completed"]:hover .clear-btn,
-.status-tab[data-status="completed"].active .clear-btn {
-  opacity: 1;
-}
-
-.clear-btn:hover {
+.clear-all-btn:hover {
   background: #dc2626;
 }
 
