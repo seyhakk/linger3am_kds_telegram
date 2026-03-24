@@ -140,8 +140,9 @@ function renderOrders() {
     return;
   }
 
-  const filtered = currentOrders
-    .filter(o => !state.statusFilter || o.status === state.statusFilter)
+    console.log('Rendering orders:', currentOrders.length, 'statusFilter:', state.statusFilter);
+    const filtered = currentOrders
+      .filter(o => !state.statusFilter || o.status === state.statusFilter)
     .sort((a, b) => {
       if (state.sortBy === 'priority') {
         if (b.priority !== a.priority) return b.priority - a.priority;
@@ -152,15 +153,15 @@ function renderOrders() {
 
   container.innerHTML = filtered.map(order => createOrderCard(order)).join('');
 
-  container.querySelectorAll('.order-card').forEach(card => {
-    card.addEventListener('click', () => {
-      const orderId = parseInt(card.dataset.orderId);
-      const order = currentOrders.find(o => o.id === orderId);
-      if (order) {
-        openOrderModal(order);
-      }
+    container.querySelectorAll('.order-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const orderId = card.dataset.orderId;
+        const order = currentOrders.find(o => o.id === orderId);
+        if (order) {
+          openOrderModal(order);
+        }
+      });
     });
-  });
 }
 
 function createOrderCard(order) {
