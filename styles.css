@@ -363,6 +363,41 @@ body {
   color: white;
 }
 
+.response-badge {
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
+.response-badge.coming {
+  background: #10b981;
+  color: white;
+}
+
+.response-badge.wait {
+  background: #3b82f6;
+  color: white;
+}
+
+.response-badge.custom {
+  background: #8b5cf6;
+  color: white;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .action-btn.active {
   opacity: 0.5;
   cursor: default;

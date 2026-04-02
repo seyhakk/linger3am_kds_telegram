@@ -211,6 +211,13 @@ function renderOrders() {
   container.innerHTML = filtered.map(order => createOrderCard(order)).join('');
 }
 
+function escHtml(s) {
+    if (!s) return '';
+    return String(s).replace(/[&<>"']/g, m => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"
+    }[m]));
+  }
+
 function createOrderCard(order) {
   const duration = getDuration(new Date(order.created_at));
   const durationClass = getDurationClass(order.created_at);
@@ -233,6 +240,11 @@ function createOrderCard(order) {
   const notificationStatus = order.notification_status || 'pending';
   const alreadyNotified = order.customer_notified_at != null;
   
+  // Customer response display
+  const responseType = order.customer_response_type;
+  const responseMessage = order.customer_response_message;
+  const responseAt = order.customer_response_at;
+  
   let notificationBadge = '';
   if (alreadyNotified) {
     notificationBadge = '<div class="notification-badge success">✓ Notified</div>';
@@ -240,6 +252,17 @@ function createOrderCard(order) {
     notificationBadge = `<div class="notification-badge error">⚠️ Failed</div>`;
   } else if (!hasChatId) {
     notificationBadge = '<div class="notification-badge warning">⚠️ No Chat ID</div>';
+  }
+  
+  // Customer response badge
+  let responseBadge = '';
+  if (responseType === 'coming_now') {
+    responseBadge = '<div class="response-badge coming">✅ Coming Now</div>';
+  } else if (responseType === 'please_wait') {
+    responseBadge = '<div class="response-badge wait">⏳ Customer Waiting</div>';
+  } else if (responseType === 'custom_message' && responseMessage) {
+    const displayMessage = responseMessage.length > 50 ? responseMessage.substring(0, 50) + '...' : responseMessage;
+    responseBadge = `<div class="response-badge custom">💬 "${escHtml(displayMessage)}"</div>`;
   }
   
   const canNotify = hasChatId && !alreadyNotified && (isNew || isPreparing);
@@ -255,6 +278,7 @@ function createOrderCard(order) {
       </div>
       ${order.table_no ? `<div class="order-table">Table: ${order.table_no}</div>` : ''}
       ${notificationBadge}
+      ${responseBadge}
       <div class="order-items">
         ${itemsHtml}
       </div>
