@@ -22,6 +22,33 @@ async function sbFetch(path, options = {}) {
   }
 }
 
+const SUPABASE_PROJECT_REF = 'dcdqjbozueinbrmfumif';
+
+async function callEdgeFunction(functionName, data) {
+  try {
+    const url = `https://${SUPABASE_PROJECT_REF}.supabase.co/functions/v1/${functionName}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+    
+    const result = await res.json();
+    
+    if (!res.ok) {
+      throw new Error(result.error || `Edge function error: ${res.status}`);
+    }
+    
+    return result;
+  } catch (err) {
+    console.error('Edge function error:', err);
+    throw err;
+  }
+}
+
 let currentOrders = [];
 let pollInterval;
 let timerInterval;
@@ -190,6 +217,21 @@ function createOrderCard(order) {
   const isNew = order.status === 'new' || order.status === 'pending';
   const isPreparing = order.status === 'preparing' || order.status === 'ready';
   const isCompleted = order.status === 'completed';
+  
+  const hasChatId = order.telegram_chat_id != null;
+  const notificationStatus = order.notification_status || 'pending';
+  const alreadyNotified = order.customer_notified_at != null;
+  
+  let notificationBadge = '';
+  if (alreadyNotified) {
+    notificationBadge = '<div class="notification-badge success">✓ Notified</div>';
+  } else if (notificationStatus === 'failed') {
+    notificationBadge = `<div class="notification-badge error">⚠️ Failed</div>`;
+  } else if (!hasChatId) {
+    notificationBadge = '<div class="notification-badge warning">⚠️ No Chat ID</div>';
+  }
+  
+  const canNotify = hasChatId && !alreadyNotified && (isNew || isPreparing);
 
   return `
     <div class="order-card ${ageClass}" data-order-id="${order.id}" data-created="${order.created_at}">
@@ -201,6 +243,7 @@ function createOrderCard(order) {
         <div class="order-duration ${durationClass}">${duration}</div>
       </div>
       ${order.table_no ? `<div class="order-table">Table: ${order.table_no}</div>` : ''}
+      ${notificationBadge}
       <div class="order-items">
         ${itemsHtml}
       </div>
@@ -210,9 +253,23 @@ function createOrderCard(order) {
         <button class="action-btn btn-preparing" 
           onclick="updateStatus('${order.id}', 'preparing')" 
           ${!isNew ? 'disabled' : ''}>PREPARE</button>
+        ${canNotify ? `
+          <button class="action-btn btn-notify" 
+            onclick="markReadyAndNotify('${order.id}')" 
+            title="Mark as ready and notify customer">
+            🔔 READY
+          </button>
+        ` : ''}
         <button class="action-btn btn-completed" 
           onclick="updateStatus('${order.id}', 'completed')" 
           ${!isNew && !isPreparing ? 'disabled' : ''}>DONE</button>
+        ${notificationStatus === 'failed' ? `
+          <button class="action-btn btn-retry" 
+            onclick="retryNotification('${order.id}')" 
+            title="Retry sending notification">
+            🔁 Retry
+          </button>
+        ` : ''}
       </div>
     </div>
   `;
@@ -228,6 +285,143 @@ async function updateStatus(orderId, newStatus) {
     await fetchOrders();
   } catch (err) {
     console.error('Failed to update status:', err);
+  }
+}
+
+async function markReadyAndNotify(orderId) {
+  const order = currentOrders.find(o => o.id === orderId);
+  if (!order) {
+    alert('Order not found');
+    return;
+  }
+
+  const hasChatId = order.telegram_chat_id != null;
+  
+  if (!hasChatId) {
+    const confirmComplete = confirm(
+      '⚠️ No Telegram chat ID available for this order.\n\n' +
+      'The customer will NOT receive a notification.\n\n' +
+      'Mark as completed anyway?'
+    );
+    
+    if (confirmComplete) {
+      await updateStatus(orderId, 'completed');
+    }
+    return;
+  }
+
+  const alreadyNotified = order.customer_notified_at != null;
+  
+  if (alreadyNotified) {
+    alert('✓ Customer already notified at: ' + new Date(order.customer_notified_at).toLocaleString());
+    return;
+  }
+
+  try {
+    const btn = document.querySelector(`[onclick*="markReadyAndNotify('${orderId}')"]`);
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '🔄 Sending...';
+    }
+
+    await sbFetch('orders?id=eq.' + orderId, {
+      method: 'PATCH',
+      headers: { 'Prefer': 'return=minimal' },
+      body: { 
+        status: 'completed',
+        ready_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+    });
+
+    const result = await callEdgeFunction('notify-customer', {
+      order_id: orderId,
+      order_ref: order.order_ref || order.order_number || orderId,
+      telegram_chat_id: order.telegram_chat_id,
+      telegram_username: order.telegram_username,
+      table_no: order.table_no,
+      total_amount: order.total_amount || order.total,
+      item_count: order.item_count
+    });
+
+    if (result.success) {
+      if (btn) {
+        btn.textContent = '✓ Notified';
+        btn.className = 'action-btn btn-success';
+      }
+      await fetchOrders();
+    } else {
+      throw new Error(result.error || 'Notification failed');
+    }
+  } catch (err) {
+    console.error('Failed to notify customer:', err);
+    
+    const btn = document.querySelector(`[onclick*="markReadyAndNotify('${orderId}')"]`);
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '🔔 READY';
+      btn.className = 'action-btn btn-notify';
+    }
+    
+    alert(
+      '❌ Failed to send notification!\n\n' +
+      'Error: ' + err.message + '\n\n' +
+      'The order status has been updated but the customer was not notified.\n' +
+      'You can retry using the "Retry" button.'
+    );
+    
+    await fetchOrders();
+  }
+}
+
+async function retryNotification(orderId) {
+  const order = currentOrders.find(o => o.id === orderId);
+  if (!order) {
+    alert('Order not found');
+    return;
+  }
+
+  if (!order.telegram_chat_id) {
+    alert('⚠️ Cannot retry: No Telegram chat ID available');
+    return;
+  }
+
+  try {
+    const btn = document.querySelector(`[onclick*="retryNotification('${orderId}')"]`);
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '🔄 Retrying...';
+    }
+
+    const result = await callEdgeFunction('notify-customer', {
+      order_id: orderId,
+      order_ref: order.order_ref || order.order_number || orderId,
+      telegram_chat_id: order.telegram_chat_id,
+      telegram_username: order.telegram_username,
+      table_no: order.table_no,
+      total_amount: order.total_amount || order.total,
+      item_count: order.item_count
+    });
+
+    if (result.success) {
+      if (btn) {
+        btn.textContent = '✓ Sent';
+        btn.className = 'action-btn btn-success';
+      }
+      await fetchOrders();
+    } else {
+      throw new Error(result.error || 'Retry failed');
+    }
+  } catch (err) {
+    console.error('Failed to retry notification:', err);
+    
+    const btn = document.querySelector(`[onclick*="retryNotification('${orderId}')"]`);
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '🔁 Retry';
+    }
+    
+    alert('❌ Retry failed!\n\nError: ' + err.message);
   }
 }
 
