@@ -77,67 +77,143 @@ async function handleCallbackQuery(callback, botToken, supabaseUrl, supabaseKey)
   const callbackId = callback.id
   const messageId = callback.message?.message_id
   
-  console.log(`Callback from ${chatId}: ${callbackData}`)
+  console.log(`\n========== CALLBACK QUERY ==========`)
+  console.log(`Chat ID: ${chatId}`)
+  console.log(`Callback Data: ${callbackData}`)
+  console.log(`Callback ID: ${callbackId}`)
+  console.log(`Message ID: ${messageId}`)
   
   // Parse action and order ID
-  const [action, orderId] = callbackData.split(':')
+  const parts = callbackData.split(':')
+  if (parts.length !== 2) {
+    console.error('Invalid callback data format')
+    await answerCallbackQuery(botToken, callbackId, '❌ Invalid request format', true)
+    return { ok: false, error: 'Invalid format' }
+  }
+  
+  const [action, orderId] = parts
+  console.log(`Action: ${action}, Order ID: ${orderId}`)
   
   // Validate order
+  console.log('Validating order...')
   const order = await validateOrder(orderId, chatId, supabaseUrl, supabaseKey)
   if (!order) {
-    await answerCallbackQuery(botToken, callbackId, '❌ Order not found', true)
+    console.error('Order validation failed')
+    await answerCallbackQuery(botToken, callbackId, '❌ Order not found or not yours', true)
     return { ok: false, error: 'Invalid order' }
+  }
+  
+  console.log(`✓ Order found: ${order.order_ref}`)
+  console.log(`Order status: ${order.status}`)
+  console.log(`Existing response: ${order.customer_response_type || 'none'}`)
+  
+  // Check if order is closed
+  if (order.status === 'completed' || order.status === 'cancelled') {
+    console.log('Order is already closed')
+    await answerCallbackQuery(botToken, callbackId, '❌ This order is already closed', true)
+    return { ok: false, error: 'Order closed' }
   }
   
   // Check if already responded
   if (order.customer_response_type) {
-    await answerCallbackQuery(botToken, callbackId, '✓ Already responded', false)
+    console.log('Duplicate response detected')
+    await answerCallbackQuery(botToken, callbackId, '✓ You already responded to this order', false)
     return { ok: true, alreadyResponded: true }
   }
   
   // Process based on action
   if (action === 'coming_now') {
-    await updateOrder(supabaseUrl, supabaseKey, orderId, { 
-      customer_response_type: 'coming_now',
-      customer_response_at: new Date().toISOString()
-    })
+    console.log('Processing: coming_now')
     
-    await editMessage(botToken, chatId, messageId,
-      `✅ Response Recorded\n\n` +
-      `Order: ${order.order_ref}\n` +
-      `You selected: "I'm coming now"`
-    )
-    await answerCallbackQuery(botToken, callbackId, '✓ Recorded', false)
-    return { ok: true, action: 'coming_now' }
+    try {
+      await updateOrder(supabaseUrl, supabaseKey, orderId, { 
+        customer_response_type: 'coming_now',
+        customer_response_at: new Date().toISOString()
+      })
+      console.log('✓ Database updated')
+      
+      // Edit the message to show response
+      const newText = `✅ <b>Response Recorded</b>\n\n` +
+        `🔖 Order: ${order.order_ref}\n` +
+        `👤 You selected: <b>"I'm coming now"</b>\n\n` +
+        `Kitchen has been notified! The staff will expect you shortly.`
+      
+      await editMessage(botToken, chatId, messageId, newText)
+      console.log('✓ Message edited')
+      
+      await answerCallbackQuery(botToken, callbackId, '✓ Response recorded!', false)
+      console.log('✓ Callback answered')
+      
+      console.log('========== SUCCESS ==========\n')
+      return { ok: true, action: 'coming_now', orderId }
+      
+    } catch (error) {
+      console.error('Error processing coming_now:', error)
+      await answerCallbackQuery(botToken, callbackId, '❌ Error saving response', true)
+      return { ok: false, error: error.message }
+    }
     
   } else if (action === 'please_wait') {
-    await updateOrder(supabaseUrl, supabaseKey, orderId, { 
-      customer_response_type: 'please_wait',
-      customer_response_at: new Date().toISOString()
-    })
+    console.log('Processing: please_wait')
     
-    await editMessage(botToken, chatId, messageId,
-      `✅ Response Recorded\n\n` +
-      `Order: ${order.order_ref}\n` +
-      `You selected: "Please wait"`
-    )
-    await answerCallbackQuery(botToken, callbackId, '✓ Recorded', false)
-    return { ok: true, action: 'please_wait' }
+    try {
+      await updateOrder(supabaseUrl, supabaseKey, orderId, { 
+        customer_response_type: 'please_wait',
+        customer_response_at: new Date().toISOString()
+      })
+      console.log('✓ Database updated')
+      
+      const newText = `✅ <b>Response Recorded</b>\n\n` +
+        `🔖 Order: ${order.order_ref}\n` +
+        `👤 You selected: <b>"Please wait"</b>\n\n` +
+        `Kitchen has been notified. Take your time!`
+      
+      await editMessage(botToken, chatId, messageId, newText)
+      console.log('✓ Message edited')
+      
+      await answerCallbackQuery(botToken, callbackId, '✓ Response recorded!', false)
+      console.log('✓ Callback answered')
+      
+      console.log('========== SUCCESS ==========\n')
+      return { ok: true, action: 'please_wait', orderId }
+      
+    } catch (error) {
+      console.error('Error processing please_wait:', error)
+      await answerCallbackQuery(botToken, callbackId, '❌ Error saving response', true)
+      return { ok: false, error: error.message }
+    }
     
   } else if (action === 'custom_message') {
-    await updateOrder(supabaseUrl, supabaseKey, orderId, { 
-      awaiting_custom_message: true 
-    })
+    console.log('Processing: custom_message')
     
-    await editMessage(botToken, chatId, messageId,
-      `✍️ Send Your Message\n\n` +
-      `Order: ${order.order_ref}\n\n` +
-      `Type your message to kitchen:`
-    )
-    await answerCallbackQuery(botToken, callbackId, '✍️ Type your message', false)
-    return { ok: true, action: 'custom_message' }
+    try {
+      await updateOrder(supabaseUrl, supabaseKey, orderId, { 
+        awaiting_custom_message: true 
+      })
+      console.log('✓ Awaiting flag set')
+      
+      const newText = `✍️ <b>Send Your Custom Message</b>\n\n` +
+        `🔖 Order: ${order.order_ref}\n\n` +
+        `Please type your message to the kitchen staff.\n\n` +
+        `Example: "I'll be there in 10 minutes"`
+      
+      await editMessage(botToken, chatId, messageId, newText)
+      console.log('✓ Message edited')
+      
+      await answerCallbackQuery(botToken, callbackId, '✍️ Please type your message', false)
+      console.log('✓ Callback answered')
+      
+      console.log('========== SUCCESS ==========\n')
+      return { ok: true, action: 'custom_message', orderId }
+      
+    } catch (error) {
+      console.error('Error processing custom_message:', error)
+      await answerCallbackQuery(botToken, callbackId, '❌ Error', true)
+      return { ok: false, error: error.message }
+    }
   }
   
+  console.log('Unknown action:', action)
   return { ok: false, error: 'Unknown action' }
 }
 

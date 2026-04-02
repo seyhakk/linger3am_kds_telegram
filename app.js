@@ -130,8 +130,17 @@ function getDuration(date) {
 
 async function fetchOrders() {
   try {
+    // Explicitly select all fields including customer response fields
+    const fields = [
+      'id', 'order_ref', 'order_number', 'status', 'created_at', 'updated_at',
+      'telegram_chat_id', 'telegram_user_id', 'telegram_username', 'customer_name',
+      'table_no', 'total_amount', 'total', 'item_count',
+      'customer_notified_at', 'notification_status', 'notification_error',
+      'customer_response_type', 'customer_response_message', 'customer_response_at'
+    ].join(',');
+    
     const [ordersRes, itemsRes] = await Promise.all([
-      sbFetch('orders?select=*&order=created_at.desc'),
+      sbFetch(`orders?select=${fields}&order=created_at.desc`),
       sbFetch('order_items?select=*')
     ]);
     
@@ -157,7 +166,11 @@ async function fetchOrders() {
       telegram_chat_id: order.telegram_chat_id || order.telegram_user_id || null,
       customer_notified_at: order.customer_notified_at || null,
       notification_status: order.notification_status || 'pending',
-      notification_error: order.notification_error || null
+      notification_error: order.notification_error || null,
+      // Customer response fields
+      customer_response_type: order.customer_response_type || null,
+      customer_response_message: order.customer_response_message || null,
+      customer_response_at: order.customer_response_at || null
     }));
 
     console.log('Processed orders:', currentOrders.length);
