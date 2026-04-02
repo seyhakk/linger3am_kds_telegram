@@ -138,6 +138,9 @@ async function fetchOrders() {
     const orders = ordersRes || [];
     const items = itemsRes || [];
     
+    console.log('Fetched orders:', orders.length);
+    console.log('Sample order:', orders[0]);
+    
     const orderItemsMap = {};
     items.forEach(item => {
       if (!orderItemsMap[item.order_id]) orderItemsMap[item.order_id] = [];
@@ -149,8 +152,16 @@ async function fetchOrders() {
       items: orderItemsMap[order.id] || [],
       order_number: order.order_ref || order.id,
       customer_name: order.telegram_username || order.customer_name || 'Guest',
-      status: order.status || 'new'
+      status: order.status || 'new',
+      // Ensure new fields exist with defaults
+      telegram_chat_id: order.telegram_chat_id || order.telegram_user_id || null,
+      customer_notified_at: order.customer_notified_at || null,
+      notification_status: order.notification_status || 'pending',
+      notification_error: order.notification_error || null
     }));
+
+    console.log('Processed orders:', currentOrders.length);
+    console.log('Sample processed order:', currentOrders[0]);
 
     updateCounts();
     renderOrders();
@@ -289,9 +300,23 @@ async function updateStatus(orderId, newStatus) {
 }
 
 async function markReadyAndNotify(orderId) {
-  const order = currentOrders.find(o => o.id === orderId);
+  console.log('markReadyAndNotify called with orderId:', orderId);
+  console.log('currentOrders:', currentOrders);
+  console.log('Number of orders:', currentOrders.length);
+  
+  // Try to find order with both string and comparison
+  const order = currentOrders.find(o => {
+    const match = o.id === orderId || o.id === String(orderId) || String(o.id) === orderId;
+    console.log(`Checking order ${o.id} === ${orderId}:`, match);
+    return match;
+  });
+  
+  console.log('Found order:', order);
+  
   if (!order) {
-    alert('Order not found');
+    console.error('Order not found in currentOrders array');
+    alert('Order not found. Please refresh the page and try again.');
+    await fetchOrders();
     return;
   }
 
