@@ -130,17 +130,9 @@ function getDuration(date) {
 
 async function fetchOrders() {
   try {
-    // Explicitly select all fields including customer response fields
-    const fields = [
-      'id', 'order_ref', 'order_number', 'status', 'created_at', 'updated_at',
-      'telegram_chat_id', 'telegram_user_id', 'telegram_username', 'customer_name',
-      'table_no', 'total_amount', 'total', 'item_count',
-      'customer_notified_at', 'notification_status', 'notification_error',
-      'customer_response_type', 'customer_response_message', 'customer_response_at'
-    ].join(',');
-    
+    // Select all fields - let Supabase return whatever exists
     const [ordersRes, itemsRes] = await Promise.all([
-      sbFetch(`orders?select=${fields}&order=created_at.desc`),
+      sbFetch('orders?select=*&order=created_at.desc'),
       sbFetch('order_items?select=*')
     ]);
     
@@ -170,7 +162,8 @@ async function fetchOrders() {
       // Customer response fields
       customer_response_type: order.customer_response_type || null,
       customer_response_message: order.customer_response_message || null,
-      customer_response_at: order.customer_response_at || null
+      customer_response_at: order.customer_response_at || null,
+      awaiting_custom_message: order.awaiting_custom_message || false
     }));
 
     console.log('Processed orders:', currentOrders.length);
@@ -246,7 +239,8 @@ function createOrderCard(order) {
     : '<div class="order-item"><span class="item-name">No items</span></div>';
 
   const isNew = order.status === 'new' || order.status === 'pending';
-  const isPreparing = order.status === 'preparing' || order.status === 'ready';
+  const isPreparing = order.status === 'preparing';
+  const isReady = order.status === 'ready';
   const isCompleted = order.status === 'completed';
   
   const hasChatId = order.telegram_chat_id != null;
@@ -310,7 +304,7 @@ function createOrderCard(order) {
         ` : ''}
         <button class="action-btn btn-completed" 
           onclick="updateStatus('${order.id}', 'completed')" 
-          ${!isNew && !isPreparing ? 'disabled' : ''}>DONE</button>
+          ${!isReady ? 'disabled' : ''}>✓ DONE</button>
         ${notificationStatus === 'failed' ? `
           <button class="action-btn btn-retry" 
             onclick="retryNotification('${order.id}')" 
@@ -390,7 +384,7 @@ async function markReadyAndNotify(orderId) {
       method: 'PATCH',
       headers: { 'Prefer': 'return=minimal' },
       body: { 
-        status: 'completed',
+        status: 'ready',
         ready_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }
