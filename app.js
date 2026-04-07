@@ -242,6 +242,7 @@ function createOrderCard(order) {
   const isPreparing = order.status === 'preparing';
   const isReady = order.status === 'ready';
   const isCompleted = order.status === 'completed';
+  const canMarkDone = isPreparing || isReady;
   
   const hasChatId = order.telegram_chat_id != null;
   const notificationStatus = order.notification_status || 'pending';
@@ -304,7 +305,7 @@ function createOrderCard(order) {
         ` : ''}
         <button class="action-btn btn-completed" 
           onclick="updateStatus('${order.id}', 'completed')" 
-          ${!isReady ? 'disabled' : ''}>✓ DONE</button>
+          ${!canMarkDone ? 'disabled' : ''}>✓ DONE</button>
         ${notificationStatus === 'failed' ? `
           <button class="action-btn btn-retry" 
             onclick="retryNotification('${order.id}')" 
