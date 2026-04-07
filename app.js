@@ -1,5 +1,5 @@
-const SUPABASE_URL = 'https://dcdqjbozueinbrmfumif.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjZHFqYm96dWVpbmJybWZ1bWlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMzI3NDcsImV4cCI6MjA4OTgwODc0N30.VXxCEz1KIXxsh5_N-M1h7Fpa6OJ8oQCCSehWAzAiOoc';
+const SUPABASE_URL = window.ENV?.SUPABASE_URL || 'https://dcdqjbozueinbrmfumif.supabase.co';
+const SUPABASE_KEY = window.ENV?.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjZHFqYm96dWVpbmJybWZ1bWlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMzI3NDcsImV4cCI6MjA4OTgwODc0N30.VXxCEz1KIXxsh5_N-M1h7Fpa6OJ8oQCCSehWAzAiOoc';
 
 async function sbFetch(path, options = {}) {
   try {
@@ -485,8 +485,35 @@ let hiddenOrders = new Set();
 
 async function clearCompleted() {
   const completedOrders = currentOrders.filter(o => o.status === 'completed');
-  completedOrders.forEach(o => hiddenOrders.add(o.id));
-  renderOrders();
+  
+  if (completedOrders.length === 0) {
+    return;
+  }
+
+  const confirmClear = confirm(
+    `Archive ${completedOrders.length} completed order(s)?\n\nThis will move them to the archive.`
+  );
+  
+  if (!confirmClear) {
+    return;
+  }
+
+  try {
+    for (const order of completedOrders) {
+      await sbFetch('orders?id=eq.' + order.id, {
+        method: 'PATCH',
+        headers: { 'Prefer': 'return=minimal' },
+        body: { 
+          status: 'archived',
+          updated_at: new Date().toISOString()
+        }
+      });
+    }
+    await fetchOrders();
+  } catch (err) {
+    console.error('Failed to archive orders:', err);
+    alert('Failed to archive orders. Please try again.');
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);
